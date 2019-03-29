@@ -80,39 +80,68 @@ class VtkPointCloud:
         self.vtkPolyData.GetPointData().SetActiveScalars('DepthArray')
     
 ###########################################################################################
-        
-# This method estimates the normal vector to each point using the Robust estimation
-def coplaner(total, indices, k):
+
+# This function performs PCA to find out which points are feature-points
+def PreCoplaner(total, indices, k):
     normals=np.zeros((len(indices),3))
     curvatures=np.zeros(len(indices))
     #for point in range(25):
     for point in range(len(indices)):
 
-        #######################################
-        neighbors=indices[point,:]
-        outMM=dm.DetMM0(total[neighbors,:])
-        covar=outMM["cov"]
-        ########################################
-
-        eigenvalues, eigenvectors = np.linalg.eig(covar)
+        dots=np.zeros((k,3))
+        
+        for nei in range(k):
+            loc=indices[point, nei]
+            xyz=[total[loc,0], total[loc,1], total[loc,2]]
+            dots[nei,:]=xyz
+        mean=np.mean(dots,axis=0)
+        
+        #mean=np.mean(total[indices[point,:k],:],axis=0)
+        data_adjust=dots-mean
+        matrix = np.cov(data_adjust.T)
+        eigenvalues, eigenvectors = np.linalg.eig(matrix)
+        
         sort = eigenvalues.argsort()[::-1]
         eigenvalues = eigenvalues[sort]
         curvature=abs(eigenvalues[2])/(abs(eigenvalues[0])+abs(eigenvalues[1])+abs(eigenvalues[2]))
+        curvatures[point]=curvature
         eigenvectors = eigenvectors[:,sort]
         normal=eigenvectors[:,2]
         normals[point,:]=normal
-        curvatures[point]=curvature
-        if point%100==0:
+        if point%1000==0:
             print("Accomplishment of: "+str(point)+" points out of: "+str(len(indices)))
     return normals, curvatures
+
+        
+# This method estimates the normal vector to each point using the Robust estimation
+def coplaner(total, indices, k, normals, mod_curv):
+    
+    
+    for point in range(len(indices)):
+
+        if mod_curv[point]==1:
+
+            #######################################
+            neighbors=indices[point,:]
+            outMM=dm.DetMM0(total[neighbors,:])
+            covar=outMM["cov"]
+            ########################################
+
+            eigenvalues, eigenvectors = np.linalg.eig(covar)
+            sort = eigenvalues.argsort()[::-1]
+            eigenvectors = eigenvectors[:,sort]
+            normal=eigenvectors[:,2]
+            normals[point,:]=normal
+        if point%100==0:
+            print("Accomplishment of: "+str(point)+" points out of: "+str(len(indices)))
+    return normals
 
 
    # In order to illustrate points, this method classifies point value into steps  
 def classifier(Colors):
-    Colors[Colors<=0.05]=0.02
-    Colors[Colors>0.05]=0.5
-    Colors[Colors>=0.2]=0.9
-    ex=np.count_nonzero(Colors == 0.9)
+    Colors[Colors<=0.05]=0
+    Colors[Colors>0.05]=1
+    ex=np.count_nonzero(Colors == 1)
     print(" number of points which were filtered out"+str(ex))
     return Colors
 
@@ -442,9 +471,17 @@ inp=input("Shall I upload the normal vectors from previous sessions? (If this is
 if (inp=='n'):
     print('It might take couple of hours. So be paitient')
 
-    normals, curvatures = coplaner(total, indices[:num_to_show], 5)
+    normals, precurv= PreCoplaner(total, indices[:num_to_show], 5)
+    Cmin=min(precurv)
+    Cmax=max(precurv)
+    precurv=(precurv-Cmin)/(Cmax-Cmin)
+    mod_curv=classifier(precurv)
+    print("Done the first part, now performing Robust normal estimation")
+
+    normals = coplaner(total, indices[:num_to_show], 5, normals, mod_curv)
     np.savetxt('normal.out', normals, delimiter=',')
-    np.savetxt('curvatures.out', curvatures, delimiter=',')
+    np.savetxt('curvatures.out', mod_curv, delimiter=',')
+    exit()
     
 elif (inp=='y'):
     print("The data will be uploaded from previous sessions")
