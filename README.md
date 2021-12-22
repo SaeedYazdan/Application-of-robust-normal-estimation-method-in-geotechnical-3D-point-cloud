@@ -4,4 +4,4 @@ The original code files for performing Deterministic MM-estimator were based on 
 
 
 To Run the codes, you should open the main-new.py and run it. All the components are called sequentially to do the job. Also, a 3D point cloud is uploaded for the ease of performance.
-The codes it the file are commented to help you understand how to code is running. Depending on your computer speed, the code might take a considerable time. Due to this fact, please be patient and follow the given instructions.
+The code in the file is commented to help you understand how it is running. Depending on your computer speed, the code might take a considerable time. Due to this fact, please be patient and follow the given instructions.
